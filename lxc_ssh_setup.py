@@ -13,14 +13,17 @@ def print_progress_bar(iteration, total, length=50, message=None, suffix=None):
     :param suffix: Suffix to display at the end of the progress bar
     """
     if message:
-        sys.stdout.write('\r')  # Return to the start of the line
-        sys.stdout.write(' ' * (length + 100) + '\r')  # Clear the current line
+        if iteration > 1:
+            sys.stdout.write('\r\033[F\033[K') # Move to the previous line and clear it
+        sys.stdout.write('\r\033[K')  # Return to the start of the line and clear it
         print(message)  # Print the message above the progress bar
 
     percent = f"{100 * (iteration / float(total)):.1f}"
     filled_len = int(length * iteration // total)
     bar = '█' * filled_len + '-' * (length - filled_len)
-    sys.stdout.write(f'\rProgress: |{bar}| {percent}% Complete {iteration}/{total} {" " + suffix if suffix else ""}{" "*20}')
+    if iteration > 1 and not message:
+        sys.stdout.write('\r\033[F\033[K') # Move to the previous line and clear it
+    sys.stdout.write(f'\rProgress: |{bar}| {percent}% Complete - {iteration}/{total} - {suffix if suffix else ""}\n')
     sys.stdout.flush()
     if iteration == total:
         print()  # Move to the next line
@@ -258,52 +261,50 @@ def main():
     print('Getting containers IDs.')
     containers = get_lxc_containers()
     container_count = len(containers)
+    message = None
 
     print('\nGetting container operating system info:')
     for i, (name, data) in enumerate(containers.items()):
+        print_progress_bar(i+1, container_count, message=message, suffix=name)
         if data['running']:
             containers[name]['version'] = get_linux_version(data['vmid'])
             message = None
         else:
             message = f"Container {name} ({data['vmid']}) is not running."
-        print_progress_bar(i+1, container_count, message=message, suffix=name)
 
     print('\nInstalling OpenSSH into containers if needed:')
     for i, (name, data) in enumerate(containers.items()):
+        print_progress_bar(i+1, container_count, message=message, suffix=name)
+        message = None
         if data['running']:
             result, message = install_openssh(containers[name])
             if result:
                 message = f"Container {name} ({data['vmid']}) {message}"
             else:
                 message = None
-        else:
-            message = f"Container {name} ({data['vmid']}) is not running."       
-        print_progress_bar(i+1, container_count, message=message, suffix=name)
 
     print('\nDisabling SSH password authentication in containers:')
     for i, (name, data) in enumerate(containers.items()):
+        print_progress_bar(i+1, container_count, message=message, suffix=name)
+        message = None
         if data['running']:
             result, message = set_ssh_password_authentication(containers[name], 'no')
             if result:
                 message = f"Container {name} ({data['vmid']}) {message}"
             else:
-                message = None
-        else:
-            message = f"Container {name} ({data['vmid']}) is not running."       
-        print_progress_bar(i+1, container_count, message=message, suffix=name)
+                message = None  
 
     if os.path.exists('keys.pub'):
         print('\nReplacing public SSH keys in containers:')
         for i, (name, data) in enumerate(containers.items()):
+            print_progress_bar(i+1, container_count, message=message, suffix=name)
+            message = None
             if data['running']:
                 result, message = add_ssh_public_keys(containers[name])
                 if result:
                     message = f"Container {name} ({data['vmid']}) {message}"
                 else:
                     message = None
-            else:
-                message = f"Container {name} ({data['vmid']}) is not running."       
-            print_progress_bar(i+1, container_count, message=message, suffix=name)
     else:
         print('\nReplacing public SSH keys is not possible. Create keys.pub file.')
 
