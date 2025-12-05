@@ -257,9 +257,19 @@ exit 2
         return True, f"Failed to add SSH keys to container: {result.stderr.strip()}"
 
 
-def main():
+def main(lxc_id=None):
     print('Getting containers IDs.')
-    containers = get_lxc_containers()
+    all_containers = get_lxc_containers()
+    
+    # Filter containers if a specific ID is provided
+    if lxc_id:
+        containers = {name: data for name, data in all_containers.items() if data['vmid'] == lxc_id}
+        if not containers:
+            print(f"Error: No container found with ID {lxc_id}")
+            sys.exit(1)
+    else:
+        containers = all_containers
+    
     container_count = len(containers)
     message = None
 
@@ -310,4 +320,5 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    lxc_id = sys.argv[1] if len(sys.argv) > 1 else None
+    main(lxc_id)
